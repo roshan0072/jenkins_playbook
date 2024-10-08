@@ -1,0 +1,61 @@
+---
+- name: Install Jenkins on RedHat
+  hosts: all
+  # become: yes  # Uncomment this if you need to run the tasks with sudo
+
+  vars:
+    jenkins_repo_url: https://pkg.jenkins.io/redhat/jenkins.repo
+    jenkins_gpg_key: https://pkg.jenkins.io/redhat/jenkins.io-2023.key
+    java_package: java-17-openjdk
+    jenkins_service_name: jenkins
+
+  tasks:
+    - name: Download Jenkins repo
+      command: >
+        wget -O /etc/yum.repos.d/jenkins.repo {{ jenkins_repo_url }}
+
+    - name: Import Jenkins GPG key
+      rpm_key:
+        state: present
+        key: "{{ jenkins_gpg_key }}"
+
+    - name: Upgrade all system packages
+      yum:
+        name: '*'
+        state: latest
+
+    - name: Install required dependencies (Java and fontconfig)
+      yum:
+        name:
+          - fontconfig
+          - "{{ java_package }}"
+        state: present
+
+    - name: Install Jenkins
+      yum:
+        name: "{{ jenkins_service_name }}"
+        state: present
+
+    - name: Reload systemctl daemon
+      command: systemctl daemon-reload
+
+    - name: Ensure Jenkins service is started and enabled
+      service:
+        name: "{{ jenkins_service_name }}"
+        state: started
+        enabled: yes
+
+    - name: Open port 8080 in the firewall for Jenkins
+      firewalld:
+        port: 8080/tcp
+        permanent: yes
+        state: enabled
+        immediate: yes
+
+    - name: Display Jenkins initial admin password
+      command: cat /var/lib/jenkins/secrets/initialAdminPassword
+      register: jenkins_password
+
+    - name: Show Jenkins initial admin password
+      debug:
+        msg: "Jenkins initial admin password is: {{ jenkins_password.stdout }}"
