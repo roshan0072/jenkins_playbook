@@ -2,7 +2,7 @@
 - name: Install Jenkins on RedHat
   hosts: all
   # become: yes  # Uncomment this if you need to run the tasks with sudo
-
+  # Roshan jangir
   vars:
     jenkins_repo_url: https://pkg.jenkins.io/redhat/jenkins.repo
     jenkins_gpg_key: https://pkg.jenkins.io/redhat/jenkins.io-2023.key
