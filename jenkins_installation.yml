@@ -60,4 +60,4 @@
       debug:
         msg: "Jenkins initial admin password is: {{ jenkins_password.stdout }}"
 
-        # Roshan jangir
+        # Roshan 
