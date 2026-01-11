@@ -1,46 +1,62 @@
 ---
 - name: Install Jenkins on RedHat
-  hosts: all
-  # become: yes  # Uncomment this if you need to run the tasks with sudo
+  hosts: webserver
+  become: yes
 
   vars:
     jenkins_repo_url: https://pkg.jenkins.io/redhat/jenkins.repo
     jenkins_gpg_key: https://pkg.jenkins.io/redhat/jenkins.io-2023.key
-    java_package: java-17-openjdk
+    java_package: temurin-21-jdk
+    java_home: /usr/lib/jvm/temurin-21-jdk
     jenkins_service_name: jenkins
 
   tasks:
+
     - name: Download Jenkins repo
-      command: >
-        wget -O /etc/yum.repos.d/jenkins.repo {{ jenkins_repo_url }}
+      get_url:
+        url: "{{ jenkins_repo_url }}"
+        dest: /etc/yum.repos.d/jenkins.repo
+        mode: '0644'
 
     - name: Import Jenkins GPG key
       rpm_key:
         state: present
         key: "{{ jenkins_gpg_key }}"
 
-    - name: Upgrade all system packages
-      yum:
-        name: '*'
-        state: latest
+    - name: Add Adoptium (Temurin) repository
+      yum_repository:
+        name: adoptium
+        description: Eclipse Adoptium
+        baseurl: https://packages.adoptium.net/artifactory/rpm/rhel/9/x86_64
+        enabled: yes
+        gpgcheck: yes
+        gpgkey: https://packages.adoptium.net/artifactory/api/gpg/key/public
 
-    - name: Install required dependencies (Java and fontconfig)
+    - name: Install required dependencies (Java 21 and fontconfig)
       yum:
         name:
           - fontconfig
           - "{{ java_package }}"
         state: present
 
+    - name: Configure Jenkins to use Java 21 explicitly
+      lineinfile:
+        path: /etc/sysconfig/jenkins
+        regexp: '^JENKINS_JAVA_HOME='
+        line: 'JENKINS_JAVA_HOME="{{ java_home }}"'
+        create: yes
+
     - name: Install Jenkins
       yum:
         name: "{{ jenkins_service_name }}"
         state: present
 
-    - name: Reload systemctl daemon
-      command: systemctl daemon-reload
+    - name: Reload systemd daemon
+      systemd:
+        daemon_reload: yes
 
-    - name: Ensure Jenkins service is started and enabled
-      service:
+    - name: Ensure Jenkins service is enabled and started
+      systemd:
         name: "{{ jenkins_service_name }}"
         state: started
         enabled: yes
@@ -52,12 +68,18 @@
         state: enabled
         immediate: yes
 
-    - name: Display Jenkins initial admin password
+    - name: Wait for Jenkins to generate initial admin password
+      wait_for:
+        path: /var/lib/jenkins/secrets/initialAdminPassword
+        timeout: 120
+
+    - name: Read Jenkins initial admin password
       command: cat /var/lib/jenkins/secrets/initialAdminPassword
       register: jenkins_password
+      changed_when: false
 
     - name: Show Jenkins initial admin password
       debug:
         msg: "Jenkins initial admin password is: {{ jenkins_password.stdout }}"
 
-        # Roshan 
+    #Roshan
